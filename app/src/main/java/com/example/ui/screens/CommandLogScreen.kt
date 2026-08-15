@@ -26,6 +26,17 @@ import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
+val COMMON_COMMANDS = listOf(
+    "adb devices", "adb shell", "adb logcat", "adb push", "adb pull", 
+    "adb install", "adb uninstall", "adb reboot", "adb reboot bootloader", 
+    "adb kill-server", "adb tcpip 5555", "adb connect",
+    "fastboot devices", "fastboot flash", "fastboot boot", 
+    "fastboot oem unlock", "fastboot reboot", "fastboot flash recovery",
+    "ls -l", "cd", "pwd", "cat", "grep", "ping", "ifconfig", "netstat", 
+    "top", "ps", "df -h", "du -sh", "chmod", "chown", 
+    "getprop", "setprop", "logcat -d", "dmesg", "clear"
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommandLogScreen(modifier: Modifier = Modifier) {
@@ -41,6 +52,16 @@ fun CommandLogScreen(modifier: Modifier = Modifier) {
     val listState = rememberLazyListState()
     
     var showHistorySheet by remember { mutableStateOf(false) }
+
+    val suggestions = remember(command) {
+        if (command.isBlank()) emptyList()
+        else {
+            val lowerCommand = command.lowercase()
+            COMMON_COMMANDS.filter { 
+                it.lowercase().startsWith(lowerCommand) && !it.equals(command, ignoreCase = true)
+            }.take(5)
+        }
+    }
 
     LaunchedEffect(logs.size) {
         if (logs.isNotEmpty()) {
@@ -89,6 +110,21 @@ fun CommandLogScreen(modifier: Modifier = Modifier) {
         }
         
         Spacer(modifier = Modifier.height(16.dp))
+        
+        // Suggestions
+        if (suggestions.isNotEmpty()) {
+            androidx.compose.foundation.lazy.LazyRow(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(suggestions) { suggestion ->
+                    SuggestionChip(
+                        onClick = { command = suggestion },
+                        label = { Text(suggestion) }
+                    )
+                }
+            }
+        }
         
         // Input Area
         Row(verticalAlignment = Alignment.CenterVertically) {
