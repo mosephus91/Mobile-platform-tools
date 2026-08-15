@@ -1,0 +1,6 @@
+{
+  "name": "ADB Manager",
+  "description": "An intuitive OTG ADB & Fastboot client with cloud sync, backup utilities, and command logging.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
