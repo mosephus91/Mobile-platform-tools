@@ -23,6 +23,8 @@ import com.example.ui.viewmodels.CommandViewModelFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
@@ -210,25 +212,53 @@ fun CommandLogScreen(modifier: Modifier = Modifier) {
 
 suspend fun executeCommand(command: String, onOutput: (String) -> Unit) {
     withContext(Dispatchers.IO) {
+        var process: Process? = null
+        var timeoutJob: Job? = null
         try {
             // Use sh -c to allow chaining, pipes, etc.
-            val process = ProcessBuilder("sh", "-c", command)
+            process = ProcessBuilder("sh", "-c", command)
                 .redirectErrorStream(true)
                 .start()
             
+            // Start a timeout coroutine to reliably kill the process if it hangs.
+            val currentProcess = process
+            timeoutJob = launch {
+                delay(30_000L) // 30-second timeout
+                currentProcess.destroy()
+                withContext(Dispatchers.Main) {
+                    onOutput("Error: Command timed out after 30 seconds.")
+                }
+            }
+
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             var line: String?
+            var lineCount = 0
+            val maxLines = 1000 // Prevent memory exhaustion
+
             while (reader.readLine().also { line = it } != null) {
+                if (lineCount >= maxLines) {
+                    withContext(Dispatchers.Main) {
+                        onOutput("Output truncated: Exceeded maximum lines limit ($maxLines).")
+                    }
+                    break // Exits the loop, allowing the finally block to destroy the process and avoid deadlock.
+                }
                 withContext(Dispatchers.Main) {
                     onOutput(line ?: "")
                 }
+                lineCount++
             }
-            process.waitFor()
+            // Only wait if we successfully read all output within limits and timeout hasn't killed it
+            if (lineCount < maxLines && process.isAlive) {
+                process.waitFor()
+            }
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
                 onOutput("Error: ${e.message}")
             }
+        } finally {
+            timeoutJob?.cancel()
+            // Ensure process is destroyed to prevent zombie processes and deadlocks
+            process?.destroy()
         }
     }
 }
-
