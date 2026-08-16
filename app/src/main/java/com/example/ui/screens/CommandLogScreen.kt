@@ -18,6 +18,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.AdbApplication
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
 import com.example.ui.viewmodels.CommandViewModel
 import com.example.ui.viewmodels.CommandViewModelFactory
 import kotlinx.coroutines.Dispatchers
@@ -128,6 +131,20 @@ fun CommandLogScreen(modifier: Modifier = Modifier) {
             }
         }
         
+        val executeCurrentCommand = {
+            if (command.isNotBlank()) {
+                val cmdToRun = command
+                logs.add("$ $cmdToRun")
+                command = ""
+                viewModel.addCommand(cmdToRun)
+                coroutineScope.launch {
+                    executeCommand(cmdToRun) { outputLine ->
+                        logs.add(outputLine)
+                    }
+                }
+            }
+        }
+
         // Input Area
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
@@ -135,23 +152,13 @@ fun CommandLogScreen(modifier: Modifier = Modifier) {
                 onValueChange = { command = it },
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("Enter command (e.g. ls, getprop)...") },
-                singleLine = true
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { executeCurrentCommand() })
             )
             Spacer(modifier = Modifier.width(8.dp))
             IconButton(
-                onClick = { 
-                    if (command.isNotBlank()) {
-                        val cmdToRun = command
-                        logs.add("$ $cmdToRun")
-                        command = ""
-                        viewModel.addCommand(cmdToRun)
-                        coroutineScope.launch {
-                            executeCommand(cmdToRun) { outputLine ->
-                                logs.add(outputLine)
-                            }
-                        }
-                    }
-                },
+                onClick = executeCurrentCommand,
                 colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Icon(Icons.Default.Send, contentDescription = "Send Command", tint = MaterialTheme.colorScheme.onPrimary)
